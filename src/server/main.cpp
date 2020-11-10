@@ -24,7 +24,11 @@ static void _libhook_init() { printf("LIBHOOK INIT\n"); }
 
 int main(int, char **, char **) {
   SwtFB fb;
-  uint16_t *shared_mem = ipc::get_shared_buffer();
+  uint16_t *shared_mem = ipc::get_shared_buffer(ipc::DEFAULT_NAME, fb.RawBuffer());
+  if (!shared_mem) {
+      cerr << "could not get shared mem" << endl;
+      exit(1);
+  }
 
   mutex draw_queue_m;
   vector<swtfb_update> updates;
@@ -52,12 +56,12 @@ int main(int, char **, char **) {
           mode = 3;
         }
 
-				int size = rect.width * rect.height;
-				if (size > 500 * 500) {
+        int size = rect.width * rect.height;
+        if (size > 500 * 500) {
 
           auto nt = new thread([&]() {
             fb.DrawRaw(shared_mem, rect.left, rect.top, rect.width, rect.height,
-                       mode, 0);
+                       mode,1, 0);
             #ifdef DEBUG_TIMING
             cerr << get_now() - s.ms << "ms threaded E2E " << rect.width << " " << rect.height << endl;
             #endif
@@ -66,7 +70,7 @@ int main(int, char **, char **) {
 
         } else {
           fb.DrawRaw(shared_mem, rect.left, rect.top, rect.width, rect.height,
-                     mode, 0);
+                     mode, 0, 0);
 
           #ifdef DEBUG_TIMING
           cerr << get_now() - s.ms << "ms E2E " << rect.width << " " << rect.height << endl;

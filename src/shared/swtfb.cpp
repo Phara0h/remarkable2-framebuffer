@@ -26,6 +26,10 @@ public:
     initQT();
   }
 
+  char* RawBuffer(){
+      return (char*)img->bits();
+  }
+
   void initQT() {
     qputenv("QMLSCENE_DEVICE", "epaper");
     qputenv("QT_QPA_PLATFORM", "epaper:enable_fonts");
@@ -36,17 +40,13 @@ public:
     app = new QGuiApplication(argc, argv);
     auto ptr = f_getInstance();
     instance = reinterpret_cast<QObject*>(ptr);
-    dump_qtClass(instance);
     img = (QImage *)(ptr + 8);
     // dump_qtClass(instance);
-
-
 
     cout << img->width() << " " << img->height() << " " << img->depth() << endl;
   }
 
   void clearScreen() {
-    QObject *object = static_cast<QObject *>((QObject*) instance);
     QMetaObject::invokeMethod(instance,"clearScreen", Qt::DirectConnection);
   }
 
@@ -57,51 +57,26 @@ public:
   void SendUpdate(const QRect &rect, int waveform, int flags, bool sync) {
       QGenericArgument argWaveform("EPFramebuffer::WaveformMode",&waveform);
       QGenericArgument argUpdateMode("EPFramebuffer::UpdateMode",&flags);
+
+      //TODO: cache the method
       QMetaObject::invokeMethod(instance,"sendUpdate", Qt::DirectConnection, Q_ARG(QRect, rect), argWaveform, argUpdateMode, Q_ARG(bool, sync));
   }
 
 
-  void DrawLine() {
-    cout << "drawing a line " << endl;
-    cout << "send update" << endl;
-    for (int i = 100; i < maxHeight; i++) {
-      QRect rect(100, i, 200, 100);
-      img->setPixel(100, i, 0xFF);
-      printf(".");
-      sendUpdate(instance, rect, 1, 0);
-    }
-  }
-  void FullScreen() {
-    QRect rect(0, 0, maxWidth, maxHeight);
-    QPainter painter(img);
-    painter.drawText(rect, 132, "Blah");
-    painter.end();
-    sendUpdate(instance, rect, 3, 3);
-  }
-
-  void DrawText(int i, char *text, bool wait=false) {
-    QRect rect(0, i, 200, 100);
-    QPainter painter(img);
-    painter.drawText(rect, 132, text);
-    painter.end();
-    sendUpdate(instance, rect, 3, wait ? 0 : 1);
-  }
-
-  void DrawRaw(uint16_t *buffer, int x, int y, int w, int h, int mode = 2, int async=0) {
+  void DrawRaw(uint16_t *buffer, int x, int y, int w, int h, int waveform, int mode, int async=0) {  
     uint16_t *dest = (uint16_t *)img->bits();
 
     int stride = maxWidth;
     int x0 = x, y0 = y, x1 = x0 + w, y1 = y0 + h;
 
-    for (int i = y0; i < y1; i++) {
-      memcpy(&dest[i * stride + x0], &buffer[i * stride + x0],
-             (x1 - x0) * sizeof(uint16_t));
-    }
+    /* for (int i = y0; i < y1; i++) { */
+    /*   memcpy(&dest[i * stride + x0], &buffer[i * stride + x0], */
+    /*          (x1 - x0) * sizeof(uint16_t)); */
+    /* } */
 
     QRect rect(x, y, w, h);
     ClockWatch cz;
-    sendUpdate(instance, rect, mode, 0, 0);
-    // SendUpdate(rect, mode, 0, 0);
+    SendUpdate(rect, waveform, mode, async);
 
     #ifdef DEBUG
     cerr << get_now() << " Total Update took " << cz.elapsed() << "s" << endl;
